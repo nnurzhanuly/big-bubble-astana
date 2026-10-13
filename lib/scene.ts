@@ -1,6 +1,6 @@
 import { products } from "./content";
 
-export type SceneKind = "balloon" | "heart" | "star" | "number" | "box" | "inscription" | "product";
+export type SceneKind = "balloon" | "heart" | "star" | "number" | "box" | "arch" | "inscription" | "product";
 export type SceneCatalogItem = { id: string; label: string; category: string; kind: SceneKind; color: string; price: number; image?: string; productId?: string; description?: string };
 export type SceneElement = { id: string; catalogId: string; x: number; y: number; scale: number; rotation: number; text?: string };
 export type SceneConfig = { version: 1; elements: SceneElement[] };
@@ -16,6 +16,7 @@ export const sceneComponents: SceneCatalogItem[] = [
   { id: "star-gold", label: "Фольгированная звезда", category: "Акценты", kind: "star", color: "#d7af70", price: 4500 },
   { id: "number-gold", label: "Шар-цифра", category: "Акценты", kind: "number", color: "#c9a369", price: 5500 },
   { id: "gift-box", label: "Подарочная коробка", category: "Детали", kind: "box", color: "#e9c8d1", price: 7000 },
+  { id: "balloon-arch", label: "Фотозона / гирлянда", category: "Арки и оформление", kind: "arch", color: "#dfa5af", price: 12000, description: "Арка из шаров в розовых, жемчужных и золотых оттенках" },
   { id: "inscription", label: "Надпись", category: "Детали", kind: "inscription", color: "#79485a", price: 3500 },
 ];
 export const sceneCatalog: SceneCatalogItem[] = [
@@ -37,14 +38,17 @@ export const sceneCatalogById = new Map(sceneCatalog.map((item) => [item.id, ite
 export const emptyScene: SceneConfig = { version: 1, elements: [] };
 export const defaultSceneText = (catalogId: string) => catalogId === "number-gold" ? "1" : catalogId === "inscription" ? "С праздником!" : undefined;
 export const sceneTemplates: SceneTemplate[] = [
-  { id: "birthday", title: "День рождения", description: "Розовые шары, золото и цифра", elements: [
-    { catalogId: "balloon-blush", x: .36, y: .38, scale: 1, rotation: -9 },
-    { catalogId: "balloon-cream", x: .49, y: .28, scale: 1.05, rotation: 6 },
-    { catalogId: "balloon-gold", x: .63, y: .39, scale: 1, rotation: 10 },
-    { catalogId: "balloon-blush", x: .43, y: .55, scale: .88, rotation: -5 },
-    { catalogId: "number-gold", x: .60, y: .58, scale: 1.08, rotation: 0, text: "1" },
+  { id: "birthday", title: "День рождения", description: "Арка, воздушный букет и подарок", elements: [
+    { catalogId: "balloon-arch", x: .38, y: .48, scale: 1, rotation: 0 },
+    { catalogId: "balloon-sky", x: .70, y: .48, scale: .82, rotation: -6 },
+    { catalogId: "balloon-cream", x: .80, y: .47, scale: .88, rotation: 3 },
+    { catalogId: "balloon-gold", x: .75, y: .66, scale: .82, rotation: 4 },
+    { catalogId: "balloon-blush", x: .88, y: .56, scale: .88, rotation: 8 },
+    { catalogId: "heart-rose", x: .83, y: .29, scale: 1.03, rotation: 8 },
+    { catalogId: "gift-box", x: .82, y: .84, scale: .95, rotation: 0 },
   ] },
   { id: "love", title: "Для любимых", description: "Сердца и нежная палитра", elements: [
+    { catalogId: "balloon-arch", x: .34, y: .48, scale: .95, rotation: 0 },
     { catalogId: "balloon-cream", x: .36, y: .45, scale: 1.06, rotation: -12 },
     { catalogId: "heart-rose", x: .51, y: .29, scale: 1.08, rotation: 7 },
     { catalogId: "balloon-blush", x: .64, y: .45, scale: 1.04, rotation: 10 },
@@ -52,6 +56,7 @@ export const sceneTemplates: SceneTemplate[] = [
     { catalogId: "gift-box", x: .63, y: .73, scale: .8, rotation: 0 },
   ] },
   { id: "welcome", title: "Тёплая встреча", description: "Голубые, жемчужные и золотые шары", elements: [
+    { catalogId: "balloon-arch", x: .34, y: .48, scale: .95, rotation: 0 },
     { catalogId: "balloon-sky", x: .35, y: .36, scale: 1, rotation: -8 },
     { catalogId: "balloon-cream", x: .50, y: .29, scale: 1, rotation: 3 },
     { catalogId: "balloon-gold", x: .64, y: .37, scale: 1, rotation: 10 },

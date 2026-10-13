@@ -23,9 +23,10 @@ export function SiteHeader() {
   }, [menuOpen]);
   function submit(event: FormEvent) { event.preventDefault(); close(); router.push(`/catalog${query.trim() ? `?q=${encodeURIComponent(query.trim())}` : ""}`); }
   return <>
-    <header className={`shop-header ${menuOpen ? "shop-header--menu-open" : ""}`}>
+    <header className={`shop-header ${pathname === "/constructor" ? "shop-header--constructor" : ""} ${menuOpen ? "shop-header--menu-open" : ""}`}>
       <div className="container shop-header__row">
         <Link href="/" className="shop-brand" onClick={close} aria-label="Big Bubble — главная">big bubble<span>.</span><small>А С Т А Н А</small></Link>
+        {pathname === "/constructor" && <><span className="shop-header__constructor-tagline">Больше<br/>чем просто шарики</span><nav className="shop-header__constructor-nav" aria-label="Главная навигация"><Link href="/catalog">Каталог</Link><Link className="active" href="/constructor">Конструктор</Link><Link href="/catalog?category=birthday">Праздники</Link><Link href="/delivery">Доставка</Link><Link href="/contacts">О нас</Link></nav></>}
         <form className="shop-search" role="search" onSubmit={submit}><span aria-hidden="true">⌕</span><input aria-label="Поиск по каталогу" placeholder="Что ищете для праздника?" value={query} onChange={(e) => setQuery(e.target.value)} /><button type="submit">Найти</button></form>
         <div className="shop-header__actions"><Link href="/favorites" className={pathname === "/favorites" ? "active" : ""} aria-label={`Избранное: ${ready ? favorites.length : 0}`}><span className="shop-icon">♡</span><span>Избранное</span>{ready && favorites.length > 0 && <b>{favorites.length}</b>}</Link><Link href="/cart" className={pathname === "/cart" ? "active" : ""} aria-label={`Корзина: ${ready ? cart.reduce((sum, item) => sum + item.quantity, 0) : 0}`}><span className="shop-icon shop-icon--cart"><CartIcon /></span><span>Корзина</span>{ready && cart.length > 0 && <b>{cart.reduce((sum, item) => sum + item.quantity, 0)}</b>}</Link></div>
         <button className="shop-menu-button" type="button" aria-label={menuOpen ? "Закрыть меню" : "Открыть меню"} aria-controls="shop-mobile-nav" aria-expanded={menuOpen} onClick={() => setMenuOpen(!menuOpen)}>{menuOpen ? "×" : "☰"}</button>
