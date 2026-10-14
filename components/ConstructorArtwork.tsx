@@ -1,5 +1,6 @@
 import Image from "next/image";
 import { type SceneCatalogItem, type SceneTemplate } from "@/lib/scene";
+import { constructorImages, constructorSprites } from "@/lib/constructor-assets";
 
 type EditorIconName = "search" | "plus" | "clear" | "drag" | "back" | "front" | "copy" | "trash" | "close" | "arrow" | "basket" | "catalog" | "templates" | "save" | "rotate" | "more";
 
@@ -27,11 +28,10 @@ export function EditorIcon({ name, className }: { name: EditorIconName; classNam
 
 export function CatalogArtwork({ item }: { item: SceneCatalogItem }) {
   if (item.kind === "product" && item.image) return <span className="editor-catalog__icon editor-catalog__icon--product"><Image src={item.image} alt="" width={54} height={54}/></span>;
-  if (item.kind === "arch") return <span className="editor-catalog__icon editor-catalog__icon--photo"><Image src="/images/constructor-arch-real.png" alt="" width={54} height={54}/></span>;
-  const latexPosition: Record<string, string> = { "balloon-blush": "0% 0%", "balloon-cream": "100% 0%", "balloon-gold": "0% 100%", "balloon-sky": "100% 100%" };
-  const accentPosition: Record<string, string> = { "heart-rose": "0% 0%", "number-gold": "100% 0%", "gift-box": "0% 100%", "star-gold": "100% 100%" };
-  const position = latexPosition[item.id] ?? accentPosition[item.id];
-  if (position) return <span className="editor-catalog__icon editor-catalog__icon--photo editor-catalog__icon--sprite" style={{ backgroundImage: `url(${latexPosition[item.id] ? "/images/constructor-latex-real.png" : "/images/constructor-accents-real.png"})`, backgroundPosition: position }} aria-hidden="true"/>;
+  if (item.kind === "arch") return <span className="editor-catalog__icon editor-catalog__icon--photo"><Image src={constructorImages.arch} alt="" width={54} height={54}/></span>;
+  const sprite = constructorSprites[item.id];
+  if (sprite) return <span className="editor-catalog__icon editor-catalog__icon--photo editor-catalog__icon--sprite" style={{ backgroundImage: `url(${constructorImages[sprite.asset]})`, backgroundPosition: `${sprite.cell[0] * 100}% ${sprite.cell[1] * 100}%` }} aria-hidden="true"/>;
+  if (item.kind === "inscription") return <span className="editor-catalog__icon editor-catalog__icon--inscription-preview" aria-hidden="true"><span>С<br/>праздником!</span></span>;
   return <span className={`editor-catalog__icon editor-catalog__icon--${item.kind}`}>
     <svg viewBox="0 0 64 64" aria-hidden="true" focusable="false">
       {item.kind === "balloon" && <><path d="M32 47c2 4-3 5-1 8 2 3-1 4 0 6" fill="none" stroke="#ad99a2" strokeWidth="1.3" strokeLinecap="round"/><ellipse cx="32" cy="25" rx="17" ry="21" fill={item.color}/><ellipse cx="26" cy="15" rx="4" ry="7" transform="rotate(22 26 15)" fill="#fff" opacity=".4"/><path d="m32 44-4 6h8l-4-6Z" fill={item.color}/></>}
@@ -39,7 +39,6 @@ export function CatalogArtwork({ item }: { item: SceneCatalogItem }) {
       {item.kind === "star" && <><path d="m32 6 7.5 16.3 17.8 2.1-13.1 12.2 3.5 17.6L32 45.4l-15.7 8.8 3.5-17.6L6.7 24.4l17.8-2.1L32 6Z" fill={item.color}/><path d="m32 13 3 7" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" opacity=".55"/></>}
       {item.kind === "number" && <text x="32" y="51" textAnchor="middle" fontFamily="Georgia, serif" fontWeight="bold" fontSize="53" fill={item.color}>1</text>}
       {item.kind === "box" && <><rect x="9" y="26" width="46" height="31" rx="2" fill={item.color} stroke="#bd90a0"/><rect x="6" y="20" width="52" height="9" rx="2" fill="#f6e4e9" stroke="#bd90a0"/><path d="M32 20v37" stroke="#bb8296" strokeWidth="5"/><path d="M32 20c-11-2-12-12-5-12 5 0 6 7 5 12Zm0 0c11-2 12-12 5-12-5 0-6 7-5 12Z" fill="#e5adbf" stroke="#bd90a0"/></>}
-      {item.kind === "inscription" && <><text x="32" y="41" textAnchor="middle" fontFamily="Georgia, serif" fontStyle="italic" fontSize="29" fill={item.color}>Aa</text><path d="M12 47c12 4 28 4 40 0" fill="none" stroke={item.color} strokeWidth="1.3" opacity=".55"/></>}
       {item.kind === "product" && <><rect x="12" y="20" width="40" height="34" rx="3" fill="#e9c8d1"/><path d="M9 21h46v9H9zm23 0v33" fill="#f6e4e9" stroke="#bb8296" strokeWidth="2"/></>}
     </svg>
   </span>;

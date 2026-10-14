@@ -155,6 +155,8 @@
 .editor-catalog__icon--photo{background-color:#faf7f6}
 .editor-catalog__icon--photo img{width:100%;height:100%;object-fit:contain}
 .editor-catalog__icon--sprite{background-repeat:no-repeat;background-size:200% 200%}
+.editor-catalog__icon--inscription-preview{background:linear-gradient(145deg,#fbf7f4,#eee2dd)}
+.editor-catalog__icon--inscription-preview span{background:linear-gradient(110deg,#684551,#bc8d72 48%,#734a54);background-clip:text;color:transparent;font-family:Georgia,serif;font-size:10px;font-style:italic;font-weight:700;line-height:1.05;text-align:center;filter:drop-shadow(0 1px 1px #5c394630)}
 .editor-catalog__name strong{color:#252530;font-weight:750}
 .editor-catalog__name small{color:#8a8285}
 .editor-catalog__item>span.editor-catalog__add{background:#bb315e;color:#fff}
@@ -219,6 +221,9 @@
 .arch-canvas__extra{position:absolute;z-index:4;display:grid;place-items:center;width:55px;height:55px;padding:0;border:1px solid #eadce0;border-radius:8px;background:#fff;box-shadow:0 4px 14px #4e2b391c;touch-action:none;cursor:grab}
 .arch-canvas__extra.is-selected{border:2px solid #ac2d5c}
 .arch-canvas__extra .editor-catalog__icon{width:52px;height:52px}.arch-canvas__extra .editor-catalog__icon img,.arch-canvas__extra .editor-catalog__icon svg{width:50px;height:50px}
+.arch-canvas__extra--inscription{width:155px;min-height:52px;padding:4px;border:0;background:transparent;box-shadow:none}
+.arch-canvas__inscription,.arch-canvas__number{background:linear-gradient(110deg,#684551,#bb8b73 50%,#734a54);background-clip:text;color:transparent;font-family:Georgia,serif;font-style:italic;text-align:center;filter:drop-shadow(0 2px 2px #50313d44)}
+.arch-canvas__inscription{font-size:20px;line-height:1.05;overflow-wrap:anywhere}.arch-canvas__number{background:linear-gradient(90deg,#80603b,#f5df9e 30%,#bc8f50 58%,#f9e7b5 80%,#87643d);background-clip:text;font-size:35px;font-weight:700;line-height:1}
 .arch-canvas__hint{position:absolute;right:14%;bottom:14%;left:14%;display:flex;flex-direction:column;align-items:center;gap:4px;padding:12px;border:1px solid #e7d6d7;border-radius:9px;background:#fffaf9de;color:#604e57;text-align:center;pointer-events:none}
 .arch-canvas__hint strong{font-size:.8rem}.arch-canvas__hint span{font-size:.63rem}
 .arch-balloon-editor,.arch-extra-editor{display:flex;align-items:center;gap:10px;flex-wrap:wrap;min-height:74px;margin-top:8px;padding:8px 11px;border:1px solid #e9dfe1;border-radius:10px;background:#fff}
@@ -230,6 +235,7 @@
 .arch-balloon-editor__hint{width:100%;color:#9b8b90;font-size:.57rem}
 .arch-extra-editor .editor-catalog__icon{width:39px;height:39px}.arch-extra-editor .editor-catalog__icon img,.arch-extra-editor .editor-catalog__icon svg{width:37px;height:37px}
 .arch-extra-editor strong{font-size:.72rem}.arch-extra-editor label{flex:1}.arch-extra-editor button{display:flex;align-items:center;gap:4px}.arch-extra-editor button svg{width:14px;height:14px}
+.arch-extra-editor input[type=text]{width:min(170px,100%);min-height:32px;padding:5px 7px;border:1px solid #e6d7dc;border-radius:5px;background:#fff;color:#3e3339;font-size:.68rem}
 .arch-editor-placeholder{min-height:55px;margin-top:8px;padding:18px 10px;border:1px solid #eee5e6;border-radius:10px;background:#fff;color:#9a8890;font-size:.68rem}
 .editor-page--v2 .editor-checkout__items{display:flex;flex-direction:column;align-items:flex-start;gap:4px}.editor-page--v2 .editor-checkout__items small{color:#927f87;font-size:.67rem}
 @media(max-width:1450px){.arch-stage{grid-template-columns:122px minmax(0,1fr)}.arch-slotrail{padding:11px 6px}.arch-slot__circle{width:27px;height:27px}.arch-slot b{font-size:.53rem}.arch-slot small{font-size:.48rem}}

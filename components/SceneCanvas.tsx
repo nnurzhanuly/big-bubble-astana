@@ -3,15 +3,14 @@ import { useEffect, useRef, useState, type DragEvent } from "react";
 import { Ellipse, Group, Image as KonvaImage, Layer, Line, Rect, RegularPolygon, Stage, Text, Transformer } from "react-konva";
 import type Konva from "konva";
 import { sceneCatalogById, type SceneConfig, type SceneElement } from "@/lib/scene";
+import { constructorImages, constructorSprites } from "@/lib/constructor-assets";
 import { EditorIcon } from "@/components/ConstructorArtwork";
 
 const BASE_WIDTH = 680;
 const BASE_HEIGHT = 520;
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
-type SceneAssets = { arch: HTMLImageElement | null; latex: HTMLImageElement | null; accents: HTMLImageElement | null };
-const latexCells: Record<string, [number, number]> = { "balloon-blush": [0, 0], "balloon-cream": [1, 0], "balloon-gold": [0, 1], "balloon-sky": [1, 1] };
-const accentCells: Record<string, [number, number]> = { "heart-rose": [0, 0], "number-gold": [1, 0], "gift-box": [0, 1], "star-gold": [1, 1] };
-function cellCrop(image: HTMLImageElement, [column, row]: [number, number]) { return { x: column * image.width / 2, y: row * image.height / 2, width: image.width / 2, height: image.height / 2 }; }
+type SceneAssets = { [K in keyof typeof constructorImages]: HTMLImageElement | null };
+function cellCrop(image: HTMLImageElement, [column, row]: readonly [number, number]) { return { x: column * image.width / 2, y: row * image.height / 2, width: image.width / 2, height: image.height / 2 }; }
 
 type Props = {
   scene: SceneConfig;
@@ -64,8 +63,9 @@ function SceneObject({ element, selected, locked, onSelect, onChange, assets }: 
   }, [selected]);
   if (!item) return null;
   const balloon = item.kind === "balloon";
-  const latexCell = latexCells[item.id];
-  const accentCell = accentCells[item.id];
+  const sprite = constructorSprites[item.id];
+  const balloonImage = balloon && sprite && sprite.asset !== "accents" ? assets[sprite.asset] : null;
+  const accentImage = sprite?.asset === "accents" ? assets.accents : null;
   const realAccent = item.kind !== "number" || (element.text || "1") === "1";
   return <>
     <Group
@@ -97,8 +97,8 @@ function SceneObject({ element, selected, locked, onSelect, onChange, assets }: 
         });
       }}
     >
-      {balloon && assets.latex && latexCell && <KonvaImage image={assets.latex} crop={cellCrop(assets.latex, latexCell)} x={-75} y={-60} width={150} height={150} shadowColor="#614959" shadowBlur={7} shadowOpacity={.12}/>}
-      {balloon && !assets.latex && <>
+      {balloon && balloonImage && sprite && <KonvaImage image={balloonImage} crop={cellCrop(balloonImage, sprite.cell)} x={-75} y={-60} width={150} height={150} shadowColor="#614959" shadowBlur={7} shadowOpacity={.12}/>}
+      {balloon && !balloonImage && <>
         <Line points={[0, 38, 4, 65, -2, 92, 0, 122]} stroke="#9b8b91" strokeWidth={1.3} listening={false}/>
         <Ellipse x={0} y={-6} radiusX={36} radiusY={45} fillRadialGradientStartPoint={{x:-12,y:-21}} fillRadialGradientEndPoint={{x:0,y:0}} fillRadialGradientStartRadius={3} fillRadialGradientEndRadius={53} fillRadialGradientColorStops={[0,"#ffffff",.22,item.color,1,item.color]} stroke="#ffffff88" strokeWidth={1} shadowColor="#71505d" shadowBlur={13} shadowOpacity={.22}/>
         <RegularPolygon x={0} y={39} sides={3} radius={7} rotation={180} fill={item.color} listening={false}/>
@@ -106,17 +106,17 @@ function SceneObject({ element, selected, locked, onSelect, onChange, assets }: 
       </>}
       {item.kind === "arch" && assets.arch && <KonvaImage image={assets.arch} x={-245} y={-230} width={520} height={475} shadowColor="#715c62" shadowBlur={9} shadowOpacity={.08}/>}
       {item.kind === "arch" && !assets.arch && <Rect x={-200} y={-200} width={400} height={400} cornerRadius={190} stroke="#dfc2c9" strokeWidth={26}/>}
-      {assets.accents && accentCell && realAccent && <KonvaImage image={assets.accents} crop={cellCrop(assets.accents, accentCell)} x={item.kind === "box" ? -70 : -60} y={item.kind === "box" ? -62 : -56} width={item.kind === "box" ? 140 : 120} height={item.kind === "box" ? 140 : 120} shadowColor="#614959" shadowBlur={8} shadowOpacity={.12}/>}
-      {item.kind === "heart" && !assets.accents && <Text x={-47} y={-53} width={94} height={106} text="♥" fontSize={92} align="center" fill={item.color} shadowColor="#6d324b" shadowBlur={12} shadowOpacity={.25}/>}
-      {item.kind === "star" && !assets.accents && <Text x={-45} y={-51} width={90} height={102} text="★" fontSize={88} align="center" fill={item.color} shadowColor="#6d4f30" shadowBlur={12} shadowOpacity={.25}/>}
-      {item.kind === "number" && (!assets.accents || !realAccent) && <Text x={-45} y={-55} width={90} height={110} text={element.text || "1"} fontSize={90} fontStyle="bold" align="center" fill={item.color} stroke="#9f7744" strokeWidth={.6} shadowColor="#6d4f30" shadowBlur={10} shadowOpacity={.22}/>}
-      {item.kind === "box" && !assets.accents && <>
+      {accentImage && sprite && realAccent && <KonvaImage image={accentImage} crop={cellCrop(accentImage, sprite.cell)} x={item.kind === "box" ? -70 : -60} y={item.kind === "box" ? -62 : -56} width={item.kind === "box" ? 140 : 120} height={item.kind === "box" ? 140 : 120} shadowColor="#614959" shadowBlur={8} shadowOpacity={.12}/>}
+      {item.kind === "heart" && !accentImage && <Text x={-47} y={-53} width={94} height={106} text="♥" fontSize={92} align="center" fill={item.color} shadowColor="#6d324b" shadowBlur={12} shadowOpacity={.25}/>}
+      {item.kind === "star" && !accentImage && <Text x={-45} y={-51} width={90} height={102} text="★" fontSize={88} align="center" fill={item.color} shadowColor="#6d4f30" shadowBlur={12} shadowOpacity={.25}/>}
+      {item.kind === "number" && (!accentImage || !realAccent) && <Text x={-45} y={-55} width={90} height={110} text={element.text || "1"} fontSize={(element.text || "1").length > 1 ? 59 : 90} fontStyle="bold" align="center" fillLinearGradientStartPoint={{ x: 0, y: 0 }} fillLinearGradientEndPoint={{ x: 90, y: 0 }} fillLinearGradientColorStops={[0, "#80603b", .25, "#f5df9e", .55, "#bc8f50", .78, "#f9e7b5", 1, "#87643d"]} stroke="#947043" strokeWidth={.8} shadowColor="#6d4f30" shadowBlur={10} shadowOpacity={.22}/>}
+      {item.kind === "box" && !accentImage && <>
         <Rect x={-53} y={-35} width={106} height={79} cornerRadius={3} fill={item.color} stroke="#c595a4" strokeWidth={2} shadowColor="#6d4252" shadowBlur={13} shadowOpacity={.2}/>
         <Rect x={-58} y={-42} width={116} height={18} cornerRadius={3} fill="#f3dfe5" stroke="#c595a4" strokeWidth={1}/>
         <Rect x={-6} y={-42} width={12} height={86} fill="#bd8295" opacity={.74}/>
         <Text x={-48} y={2} width={96} text="BIG BUBBLE" fontSize={10} fontStyle="bold" align="center" fill="#8e5b6e"/>
       </>}
-      {item.kind === "inscription" && <Text x={-105} y={-24} width={210} height={55} text={element.text || "С праздником!"} fontSize={24} fontFamily="Georgia" fontStyle="italic" align="center" fill={item.color} wrap="word"/>}
+      {item.kind === "inscription" && <Text x={-105} y={-24} width={210} height={55} text={element.text || "С праздником!"} fontSize={24} fontFamily="Georgia" fontStyle="italic" align="center" fillLinearGradientStartPoint={{ x: 0, y: 0 }} fillLinearGradientEndPoint={{ x: 210, y: 0 }} fillLinearGradientColorStops={[0, "#684551", .48, "#b88971", 1, "#734a54"]} shadowColor="#50313d" shadowBlur={3} shadowOffsetY={1} shadowOpacity={.22} wrap="word"/>}
       {item.kind === "product" && item.image && <ProductArtwork src={item.image} title={item.label}/>}
     </Group>
     {selected && <Transformer ref={transformerRef} keepRatio rotateEnabled enabledAnchors={["top-left", "top-right", "bottom-left", "bottom-right"]} anchorSize={10} borderStroke="#aa5070" anchorStroke="#aa5070" anchorFill="#fff"/>}
@@ -126,14 +126,13 @@ function SceneObject({ element, selected, locked, onSelect, onChange, assets }: 
 export default function SceneCanvas({ scene, selectedId, onSelect, onChange, onDropCatalog, lockedIds = [] }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(BASE_WIDTH);
-  const [assets, setAssets] = useState<SceneAssets>({ arch: null, latex: null, accents: null });
+  const [assets, setAssets] = useState<SceneAssets>({ arch: null, latex: null, latexExtra: null, accents: null });
   useEffect(() => {
     let active = true;
-    const sources: Record<keyof SceneAssets, string> = { arch: "/images/constructor-arch-real.png", latex: "/images/constructor-latex-real.png", accents: "/images/constructor-accents-real.png" };
-    (Object.keys(sources) as (keyof SceneAssets)[]).forEach((key) => {
+    (Object.keys(constructorImages) as (keyof SceneAssets)[]).forEach((key) => {
       const image = new window.Image();
       image.onload = () => { if (active) setAssets((current) => ({ ...current, [key]: image })); };
-      image.src = sources[key];
+      image.src = constructorImages[key];
     });
     return () => { active = false; };
   }, []);
