@@ -3,13 +3,15 @@ import { NextResponse } from "next/server";
 import { products } from "@/lib/content";
 import { bundleDescription, bundlePrice, parseBundle } from "@/lib/builder";
 import { parseScene, sceneDescription, scenePrice } from "@/lib/scene";
+import { archDescription, archPrice, parseArch, parseReady, readyDescription, readyPrice } from "@/lib/arch";
+import { serviceFee } from "@/lib/cart";
 import { paymentConfig } from "@/lib/payment/config";
 import { createAccessToken, createOrder, publicOrder, type StoredOrder } from "@/lib/payment/store";
 export const runtime = "nodejs";
 const findProduct = (id: string) => products.find((product) => product.id === id);
 export async function POST(request: Request) {
   const length = Number(request.headers.get("content-length") || 0);
-  if (length > 16000) return NextResponse.json({ error: "Заказ слишком большой." }, { status: 413 });
+  if (length > 64000) return NextResponse.json({ error: "Заказ слишком большой." }, { status: 413 });
   const config = paymentConfig();
   if (config.mode === "unavailable") return NextResponse.json({ error: "Оплата пока не настроена. Попробуйте позже." }, { status: 503 });
   let raw: unknown;
@@ -33,14 +35,17 @@ export async function POST(request: Request) {
     if (typeof item.id !== "string" || !Number.isInteger(item.quantity) || (item.quantity as number) < 1 || (item.quantity as number) > 99 || items.some((entry) => entry.id === item.id)) return NextResponse.json({ error: "Проверьте товары в корзине." }, { status: 400 });
     if (item.type === "bundle") { const config = parseBundle(item.config); if (!/^bundle-[0-9a-f-]{36}$/.test(item.id) || !config) return NextResponse.json({ error: "Проверьте состав набора." }, { status: 400 }); items.push({ id: item.id, title: `Набор по вашему дизайну: ${bundleDescription(config)}`, quantity: item.quantity as number, unitPrice: bundlePrice(config), configuration: config }); continue; }
     if (item.type === "scene") { const config = parseScene(item.config); if (!/^scene-[0-9a-f-]{36}$/.test(item.id) || !config) return NextResponse.json({ error: "Проверьте состав набора." }, { status: 400 }); items.push({ id: item.id, title: `Набор по вашему дизайну: ${sceneDescription(config)}`, quantity: item.quantity as number, unitPrice: scenePrice(config), configuration: config }); continue; }
+    if (item.type === "arch") { const config = parseArch(item.config); if (!/^arch-[0-9a-f-]{36}$/.test(item.id) || !config) return NextResponse.json({ error: "Проверьте состав арки." }, { status: 400 }); items.push({ id: item.id, title: `Своя арка: ${archDescription(config)}`, quantity: item.quantity as number, unitPrice: archPrice(config), configuration: config }); continue; }
+    if (item.type === "ready") { const config = parseReady(item.config); if (!/^ready-[0-9a-f-]{36}$/.test(item.id) || !config) return NextResponse.json({ error: "Проверьте готовую композицию." }, { status: 400 }); items.push({ id: item.id, title: `Готовая композиция: ${readyDescription(config)}`, quantity: item.quantity as number, unitPrice: readyPrice(config), configuration: config }); continue; }
     const product = findProduct(item.id);
     if (!product) return NextResponse.json({ error: "Проверьте товары в корзине." }, { status: 400 });
     items.push({ id: product.id, title: product.title, quantity: item.quantity as number, unitPrice: product.price });
   }
   const itemsTotal = items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
-  const deliveryFee = delivery === "delivery" ? config.deliveryFee : 0;
+  const deliveryFee = 0;
+  const assemblyFee = serviceFee(itemsTotal);
   const id = `BB-${randomBytes(16).toString("hex").toUpperCase()}`;
-  const order: StoredOrder = { id, accessToken: createAccessToken(), createdAt: new Date().toISOString(), status: "pending_payment", mode: config.mode, name, phone, delivery, address: address || null, date: date || null, comment, items, itemsTotal, deliveryFee, total: itemsTotal + deliveryFee, currency: "KZT" };
+  const order: StoredOrder = { id, accessToken: createAccessToken(), createdAt: new Date().toISOString(), status: "pending_payment", mode: config.mode, name, phone, delivery, address: address || null, date: date || null, comment, items, itemsTotal, serviceFee: assemblyFee, deliveryFee, total: itemsTotal + assemblyFee + deliveryFee, currency: "KZT" };
   try { await createOrder(order); } catch { return NextResponse.json({ error: "Не удалось создать заказ. Попробуйте позже." }, { status: 500 }); }
   return NextResponse.json({ ...publicOrder(order), accessToken: order.accessToken, terminalId: config.terminalId, description: `Оплата заказа ${id}`, phone }, { status: 201 });
 }

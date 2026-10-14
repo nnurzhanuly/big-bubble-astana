@@ -19,6 +19,7 @@ type Props = {
   onSelect: (id: string | null) => void;
   onChange: (id: string, patch: Partial<SceneElement>) => void;
   onDropCatalog: (catalogId: string, x: number, y: number) => void;
+  lockedIds?: string[];
 };
 
 function ProductArtwork({ src, title }: { src: string; title: string }) {
@@ -43,9 +44,10 @@ function ProductArtwork({ src, title }: { src: string; title: string }) {
   </>;
 }
 
-function SceneObject({ element, selected, onSelect, onChange, assets }: {
+function SceneObject({ element, selected, locked, onSelect, onChange, assets }: {
   element: SceneElement;
   selected: boolean;
+  locked: boolean;
   onSelect: () => void;
   onChange: (patch: Partial<SceneElement>) => void;
   assets: SceneAssets;
@@ -73,10 +75,10 @@ function SceneObject({ element, selected, onSelect, onChange, assets }: {
       scaleX={element.scale}
       scaleY={element.scale}
       rotation={element.rotation}
-      draggable
-      onClick={onSelect}
-      onTap={onSelect}
-      onDragStart={onSelect}
+      draggable={!locked}
+      onClick={() => { if (!locked) onSelect(); }}
+      onTap={() => { if (!locked) onSelect(); }}
+      onDragStart={() => { if (!locked) onSelect(); }}
       onDragEnd={(event) => {
         const x = clamp(event.target.x() / BASE_WIDTH, .035, .965);
         const y = clamp(event.target.y() / BASE_HEIGHT, .05, .95);
@@ -121,7 +123,7 @@ function SceneObject({ element, selected, onSelect, onChange, assets }: {
   </>;
 }
 
-export default function SceneCanvas({ scene, selectedId, onSelect, onChange, onDropCatalog }: Props) {
+export default function SceneCanvas({ scene, selectedId, onSelect, onChange, onDropCatalog, lockedIds = [] }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(BASE_WIDTH);
   const [assets, setAssets] = useState<SceneAssets>({ arch: null, latex: null, accents: null });
@@ -153,7 +155,7 @@ export default function SceneCanvas({ scene, selectedId, onSelect, onChange, onD
   return <div ref={containerRef} className="scene-canvas" onDragOver={(event) => { if (event.dataTransfer.types.includes("application/x-bigbubble-element")) event.preventDefault(); }} onDrop={drop}>
     <Stage width={width} height={BASE_HEIGHT * scale} onMouseDown={(event) => { if (event.target === event.target.getStage()) onSelect(null); }} onTouchStart={(event) => { if (event.target === event.target.getStage()) onSelect(null); }}>
       <Layer scaleX={scale} scaleY={scale}>
-        {scene.elements.map((element) => <SceneObject key={element.id} element={element} selected={element.id === selectedId} onSelect={() => onSelect(element.id)} onChange={(patch) => onChange(element.id, patch)} assets={assets}/>)}
+        {scene.elements.map((element) => <SceneObject key={element.id} element={element} selected={element.id === selectedId} locked={lockedIds.includes(element.id)} onSelect={() => onSelect(element.id)} onChange={(patch) => onChange(element.id, patch)} assets={assets}/>)}
       </Layer>
     </Stage>
     {!scene.elements.length && <div className="scene-canvas__empty" aria-hidden="true"><span className="scene-canvas__empty-icon"><EditorIcon name="drag"/></span><strong>Ваша композиция начинается здесь</strong><small>Перетащите элемент на сцену или выберите его в каталоге</small></div>}

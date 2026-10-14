@@ -1,162 +1,195 @@
 "use client";
-import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, type DragEvent, type KeyboardEvent } from "react";
+import { useEffect, useState, type DragEvent } from "react";
 import { useShop } from "@/components/ShopProvider";
 import { formatPrice } from "@/lib/content";
-import { defaultSceneText, emptyScene, parseScene, sceneCatalog, sceneCatalogById, sceneCategories, scenePrice, sceneTemplates, type SceneConfig, type SceneElement } from "@/lib/scene";
+import { serviceFee } from "@/lib/cart";
+import { archBalloons, archHeights, archPatterns, archPrice, balloonMaterials, balloonSizes, emptyArch, isArchBalloon, isReadyExtra, parseArch, parseReady, readyPrice, type ArchConfig, type ArchHeight, type ArchOverride, type ArchPattern, type BalloonMaterial, type BalloonSize, type ReadyConfig } from "@/lib/arch";
+import { defaultSceneText, sceneCatalog, sceneCatalogById, sceneTemplates, type SceneConfig, type SceneElement } from "@/lib/scene";
 import { CatalogArtwork, EditorIcon, TemplateArtwork } from "@/components/ConstructorArtwork";
+import ArchCanvas from "@/components/ArchCanvas";
 
-const SceneCanvas = dynamic(() => import("@/components/SceneCanvas"), { ssr: false, loading: () => <div className="scene-canvas scene-canvas--loading">Загружаем сцену…</div> });
-const MAX_ELEMENTS = 30;
+const SceneCanvas = dynamic(() => import("@/components/SceneCanvas"), { ssr: false, loading: () => <div className="scene-canvas scene-canvas--loading">Загружаем композицию…</div> });
+type Mode = "ready" | "arch";
+const blankReady = (): ReadyConfig => ({ version: 1, templateId: sceneTemplates[0].id, extras: [] });
 
 export default function ConstructorView() {
   const router = useRouter();
-  const { addScene } = useShop();
-  const [scene, setScene] = useState<SceneConfig>(emptyScene);
-  const [draftReady, setDraftReady] = useState(false);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [showOptions, setShowOptions] = useState(false);
+  const { addArch, addReady } = useShop();
+  const [mode, setMode] = useState<Mode>("ready");
+  const [ready, setReady] = useState<ReadyConfig>(blankReady);
+  const [arch, setArch] = useState<ArchConfig>(emptyArch);
+  const [hydrated, setHydrated] = useState(false);
+  const [rightTab, setRightTab] = useState<Mode>("ready");
+  const [mobilePanel, setMobilePanel] = useState<"catalog" | "templates">("catalog");
   const [category, setCategory] = useState("Все");
   const [query, setQuery] = useState("");
-  const [mobilePanel, setMobilePanel] = useState<"catalog" | "templates">("catalog");
+  const [selectedSlot, setSelectedSlot] = useState(0);
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+  const [selectedExtraId, setSelectedExtraId] = useState<string | null>(null);
   const [notice, setNotice] = useState("");
 
   useEffect(() => {
     try {
-      const stored: unknown = JSON.parse(localStorage.getItem("bb-scene-draft") || "null");
-      const parsed = parseScene(stored);
-      if (parsed) setScene(parsed);
-      else if (stored && typeof stored === "object" && "elements" in stored && Array.isArray(stored.elements) && stored.elements.length === 0 && localStorage.getItem("bb-constructor-preview-seen")) setScene(emptyScene);
-      else {
-        const starter = sceneTemplates[0];
-        const elements = starter.elements.map((element) => ({ ...element, id: crypto.randomUUID() }));
-        setScene({ version: 1, elements });
-        setSelectedId(elements[1]?.id ?? null);
-        localStorage.setItem("bb-constructor-preview-seen", "1");
-      }
-    } catch { /* Damaged local draft is ignored. */ }
-    setDraftReady(true);
+      const stored = JSON.parse(localStorage.getItem("bb-constructor-v2") || "null") as { mode?: Mode; ready?: unknown; arch?: unknown } | null;
+      const savedReady = parseReady(stored?.ready);
+      const savedArch = parseArch(stored?.arch);
+      if (savedReady) setReady(savedReady);
+      if (savedArch) setArch(savedArch);
+      if (stored?.mode === "ready" || stored?.mode === "arch") { setMode(stored.mode); setRightTab(stored.mode); }
+    } catch { /* A damaged local draft is ignored. */ }
+    setHydrated(true);
   }, []);
-  useEffect(() => { if (draftReady) localStorage.setItem("bb-scene-draft", JSON.stringify(scene)); }, [scene, draftReady]);
+  useEffect(() => { if (hydrated) localStorage.setItem("bb-constructor-v2", JSON.stringify({ mode, ready, arch })); }, [mode, ready, arch, hydrated]);
 
-  const selected = scene.elements.find((element) => element.id === selectedId) ?? null;
-  const selectedCatalog = selected ? sceneCatalogById.get(selected.catalogId) : null;
-  const search = query.trim().toLocaleLowerCase("ru");
-  const visibleCatalog = sceneCatalog.filter((item) => (category === "Все" || item.category === category) && `${item.label} ${item.category} ${item.description ?? ""}`.toLocaleLowerCase("ru").includes(search));
-  const total = scenePrice(scene);
-  const parsed = parseScene(scene);
+  const template = sceneTemplates.find((item) => item.id === ready.templateId)!;
+  const baseElements: SceneElement[] = template.elements.map((element, index) => ({ ...element, id: `template-base-${index}` }));
+  const readyScene: SceneConfig = { version: 1, elements: [...baseElements, ...ready.extras] };
+  const balloons = archBalloons(arch);
+  const filled = balloons.filter((item) => item.catalogId);
+  const selectedBalloon = selectedIndex === null ? null : balloons[selectedIndex] ?? null;
+  const activeExtras = mode === "ready" ? ready.extras : arch.extras;
+  const selectedExtra = activeExtras.find((item) => item.id === selectedExtraId) ?? null;
+  const selectedExtraCatalog = selectedExtra ? sceneCatalogById.get(selectedExtra.catalogId) : null;
+  const subtotal = mode === "ready" ? readyPrice(ready) : archPrice(arch);
+  const fee = serviceFee(subtotal);
+  const catalogSource = sceneCatalog.filter((item) => mode === "arch" ? item.id !== "balloon-arch" : isReadyExtra(item.id));
+  const categories = ["Все", ...new Set(catalogSource.map((item) => item.category))];
+  const term = query.trim().toLocaleLowerCase("ru");
+  const visibleCatalog = catalogSource.filter((item) => (category === "Все" || category === item.category) && `${item.label} ${item.category} ${item.description ?? ""}`.toLocaleLowerCase("ru").includes(term));
 
-  function addElement(catalogId: string, x?: number, y?: number) {
-    if (!sceneCatalogById.has(catalogId)) return;
-    if (scene.elements.length >= MAX_ELEMENTS) { setNotice(`На сцене может быть не больше ${MAX_ELEMENTS} элементов.`); return; }
+  function switchMode(next: Mode) {
+    setMode(next); setRightTab(next); setCategory("Все"); setSelectedExtraId(null); setSelectedIndex(null); setNotice("");
+  }
+  function addExtra(catalogId: string, x?: number, y?: number) {
+    if (mode === "ready" && !isReadyExtra(catalogId)) { setNotice("К готовому шаблону можно добавить подарки и фольгированные фигуры."); return; }
+    if (mode === "arch" && (!sceneCatalogById.has(catalogId) || catalogId === "balloon-arch")) return;
+    if (activeExtras.length >= 12) { setNotice("Рядом с композицией можно разместить до 12 дополнений."); return; }
     const id = crypto.randomUUID();
-    const offset = scene.elements.length % 5;
-    const element: SceneElement = { id, catalogId, x: x ?? .37 + offset * .065, y: y ?? .38 + offset * .055, scale: 1, rotation: 0, ...(defaultSceneText(catalogId) ? { text: defaultSceneText(catalogId) } : {}) };
-    setScene((current) => ({ ...current, elements: [...current.elements, element] }));
-    setSelectedId(id);
-    setShowOptions(false);
-    setNotice("");
+    const element: SceneElement = { id, catalogId, x: x ?? .68, y: y ?? .69, scale: 1, rotation: 0, ...(defaultSceneText(catalogId) ? { text: defaultSceneText(catalogId) } : {}) };
+    if (mode === "ready") setReady((current) => ({ ...current, extras: [...current.extras, element] }));
+    else setArch((current) => ({ ...current, extras: [...current.extras, element] }));
+    setSelectedExtraId(id); setSelectedIndex(null); setNotice("");
   }
-  function updateElement(id: string, patch: Partial<SceneElement>) {
-    setScene((current) => ({ ...current, elements: current.elements.map((element) => element.id === id ? { ...element, ...patch } : element) }));
+  function updateExtra(id: string, patch: Partial<SceneElement>) {
+    if (mode === "ready") setReady((current) => ({ ...current, extras: current.extras.map((item) => item.id === id ? { ...item, ...patch } : item) }));
+    else setArch((current) => ({ ...current, extras: current.extras.map((item) => item.id === id ? { ...item, ...patch } : item) }));
   }
-  function removeSelected() {
-    if (!selected) return;
-    setScene((current) => ({ ...current, elements: current.elements.filter((element) => element.id !== selected.id) }));
-    setSelectedId(null);
-    setShowOptions(false);
+  function removeExtra() {
+    if (!selectedExtraId) return;
+    if (mode === "ready") setReady((current) => ({ ...current, extras: current.extras.filter((item) => item.id !== selectedExtraId) }));
+    else setArch((current) => ({ ...current, extras: current.extras.filter((item) => item.id !== selectedExtraId) }));
+    setSelectedExtraId(null);
   }
-  function duplicateSelected() {
-    if (!selected) return;
-    if (scene.elements.length >= MAX_ELEMENTS) { setNotice(`На сцене может быть не больше ${MAX_ELEMENTS} элементов.`); return; }
-    const clone = { ...selected, id: crypto.randomUUID(), x: Math.min(.95, selected.x + .06), y: Math.min(.95, selected.y + .06) };
-    setScene((current) => ({ ...current, elements: [...current.elements, clone] }));
-    setSelectedId(clone.id);
+  function setSlot(index: number, catalogId: string | null) {
+    if (catalogId && !isArchBalloon(catalogId)) { setNotice("В слот арки можно поставить только шар."); return; }
+    setArch((current) => ({ ...current, slots: current.slots.map((item, at) => at === index ? catalogId : item), overrides: catalogId ? current.overrides : current.overrides.filter((item) => balloons[item.index]?.slot !== index) }));
+    setSelectedSlot(index); setSelectedIndex(null); setNotice(catalogId ? "Шары расставлены по выбранной схеме." : "Слот очищен — в арке появились пробелы.");
   }
-  function moveLayer(direction: -1 | 1) {
-    if (!selected) return;
-    setScene((current) => {
-      const index = current.elements.findIndex((element) => element.id === selected.id);
-      const next = index + direction;
-      if (index < 0 || next < 0 || next >= current.elements.length) return current;
-      const elements = [...current.elements];
-      [elements[index], elements[next]] = [elements[next], elements[index]];
-      return { ...current, elements };
+  function changePattern(pattern: ArchPattern) {
+    const spec = archPatterns.find((item) => item.id === pattern)!;
+    setArch((current) => ({ ...current, pattern, slots: Array.from({ length: spec.defaultSlots }, (_, index) => current.slots[index] ?? null) }));
+    setMode("arch"); setRightTab("arch"); setSelectedSlot(0); setSelectedIndex(null); setSelectedExtraId(null); setNotice(`Схема «${spec.label}» применена. Индивидуальные параметры шаров сохранены.`);
+  }
+  function changeSlotCount(delta: number) {
+    if (arch.pattern === "cross") return;
+    const count = Math.max(2, Math.min(6, arch.slots.length + delta));
+    setArch((current) => ({ ...current, slots: Array.from({ length: count }, (_, index) => current.slots[index] ?? null) }));
+    setSelectedSlot((value) => Math.min(value, count - 1)); setSelectedIndex(null);
+  }
+  function changeHeight(height: ArchHeight) {
+    const count = archHeights.find((item) => item.value === height)!.columns * 3;
+    setArch((current) => ({ ...current, height, overrides: current.overrides.filter((item) => item.index < count) }));
+    setSelectedIndex(null);
+  }
+  function updateBalloon(index: number, patch: Partial<ArchOverride>) {
+    setArch((current) => {
+      const previous = current.overrides.find((item) => item.index === index) ?? { index };
+      return { ...current, overrides: [...current.overrides.filter((item) => item.index !== index), { ...previous, ...patch }] };
     });
   }
-  function applyTemplate(templateId: string) {
-    const template = sceneTemplates.find((item) => item.id === templateId);
-    if (!template) return;
-    const elements = template.elements.map((element) => ({ ...element, id: crypto.randomUUID() }));
-    setScene({ version: 1, elements });
-    setSelectedId(elements[1]?.id ?? null);
-    setShowOptions(false);
-    setNotice(`Шаблон «${template.title}» загружен. Вы можете менять каждый элемент.`);
+  function changeBalloonSize(index: number, size: BalloonSize) {
+    const selected = balloons[index];
+    if (!selected?.catalogId) return;
+    if (size === "large" && balloons.some((other) => other.index !== index && other.catalogId && other.size === "large" && Math.abs(other.column - selected.column) <= 1 && Math.abs(other.row - selected.row) <= 1)) {
+      setNotice("Рядом уже есть крупный шар. Уменьшите его, чтобы освободить место."); return;
+    }
+    updateBalloon(index, { size }); setNotice("");
   }
-  function clearScene() { setScene(emptyScene); setSelectedId(null); setShowOptions(false); setNotice("Сцена очищена."); }
-  function saveDraft() { localStorage.setItem("bb-scene-draft", JSON.stringify(scene)); setNotice("Набор сохранён на этом устройстве."); }
+  function moveBalloon(from: number, to: number) {
+    const a = balloons[from], b = balloons[to];
+    if (!a?.catalogId || !b?.catalogId) return;
+    setArch((current) => ({ ...current, overrides: [...current.overrides.filter((item) => item.index !== from && item.index !== to), { index: from, catalogId: b.catalogId!, size: b.size, material: b.material }, { index: to, catalogId: a.catalogId!, size: a.size, material: a.material }] }));
+    setSelectedIndex(to); setNotice("Шары поменялись местами.");
+  }
+  function moveSelectedBalloon(direction: -1 | 1) {
+    if (selectedIndex === null) return;
+    const next = direction < 0
+      ? [...filled].reverse().find((item) => item.index < selectedIndex)
+      : filled.find((item) => item.index > selectedIndex);
+    if (next) moveBalloon(selectedIndex, next.index);
+  }
+  function selectTemplate(id: string) {
+    if (!sceneTemplates.some((item) => item.id === id)) return;
+    setReady({ version: 1, templateId: id, extras: [] }); switchMode("ready"); setNotice("Готовая композиция выбрана. Можно добавить подарок или фольгированную фигуру рядом.");
+  }
+  function addFromCatalog(id: string, x?: number, y?: number) {
+    if (mode === "arch" && isArchBalloon(id)) setSlot(selectedSlot, id);
+    else addExtra(id, x, y);
+  }
+  function startDrag(event: DragEvent<HTMLDivElement>, id: string) { event.dataTransfer.setData("application/x-bigbubble-element", id); event.dataTransfer.effectAllowed = "copy"; }
+  function dropSlot(event: DragEvent<HTMLButtonElement>, index: number) {
+    event.preventDefault(); event.stopPropagation();
+    const id = event.dataTransfer.getData("application/x-bigbubble-element");
+    setSlot(index, id);
+  }
+  function clearCurrent() {
+    if (mode === "ready") setReady((current) => ({ ...current, extras: [] }));
+    else setArch((current) => ({ ...current, slots: current.slots.map(() => null), overrides: [], extras: [] }));
+    setSelectedExtraId(null); setSelectedIndex(null); setNotice(mode === "ready" ? "Дополнения убраны. Готовый шаблон сохранён." : "Арка очищена.");
+  }
+  function saveDraft() { localStorage.setItem("bb-constructor-v2", JSON.stringify({ mode, ready, arch })); setNotice("Черновик сохранён на этом устройстве."); }
   function toCart() {
-    if (!parsed) { setNotice(scene.elements.length ? "Проверьте цифру или текст надписи." : "Добавьте хотя бы один элемент."); return; }
-    addScene(parsed);
+    if (mode === "ready") { const config = parseReady(ready); if (!config) { setNotice("Проверьте дополнения к шаблону."); return; } addReady(config); }
+    else { const config = parseArch(arch); if (!config) { setNotice("Проверьте параметры арки."); return; } addArch(config); }
     router.push("/cart");
   }
-  function keyboardMove(event: KeyboardEvent<HTMLDivElement>) {
-    if (!selected) return;
-    const step = event.shiftKey ? .025 : .008;
-    const delta: Record<string, [number, number]> = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] };
-    if (delta[event.key]) {
-      event.preventDefault();
-      updateElement(selected.id, { x: Math.min(.965, Math.max(.035, selected.x + delta[event.key][0])), y: Math.min(.95, Math.max(.05, selected.y + delta[event.key][1])) });
-    } else if (event.key === "Delete" || event.key === "Backspace") { event.preventDefault(); removeSelected(); }
-  }
-  function startDrag(event: DragEvent<HTMLButtonElement>, catalogId: string) { event.dataTransfer.setData("application/x-bigbubble-element", catalogId); event.dataTransfer.effectAllowed = "copy"; }
 
-  return <main id="main" className="editor-page container">
+  return <main id="main" className="editor-page container editor-page--v2">
     <div className="editor-mobile-tabs" role="tablist" aria-label="Панели конструктора">
       <button type="button" role="tab" aria-selected={mobilePanel === "catalog"} onClick={() => setMobilePanel("catalog")}><EditorIcon name="catalog"/>Ассортимент</button>
-      <button type="button" role="tab" aria-selected={mobilePanel === "templates"} onClick={() => setMobilePanel("templates")}><EditorIcon name="templates"/>Шаблоны</button>
+      <button type="button" role="tab" aria-selected={mobilePanel === "templates"} onClick={() => setMobilePanel("templates")}><EditorIcon name="templates"/>Шаблоны и схемы</button>
     </div>
     <div className="editor-layout">
       <aside className={`editor-panel editor-catalog ${mobilePanel === "catalog" ? "editor-panel--mobile-active" : ""}`} aria-label="Каталог элементов">
-        <div className="editor-panel__head"><h2>Весь праздничный ассортимент</h2><small>{sceneCatalog.length} товаров и элементов</small></div>
-        <div className="editor-search-wrap"><EditorIcon name="search"/><input className="editor-search" aria-label="Поиск элементов" placeholder="Найти шарики, цвета, товары…" value={query} onChange={(event) => setQuery(event.target.value)}/></div>
-        <div className="editor-filters" aria-label="Категории">{sceneCategories.map((item) => <button key={item} type="button" aria-pressed={category === item} className={category === item ? "active" : ""} onClick={() => setCategory(item)}>{item}</button>)}</div>
-        <div className="editor-catalog__list">{visibleCatalog.map((item) => <button key={item.id} className="editor-catalog__item" type="button" draggable onDragStart={(event) => startDrag(event, item.id)} onClick={() => addElement(item.id)} title="Нажмите или перетащите на сцену">
-          <CatalogArtwork item={item}/><span className="editor-catalog__name"><strong>{item.label}</strong><small>{item.kind === "product" ? item.category : item.description ?? (item.kind === "balloon" ? "Латексный шар" : item.category)}</small></span><span className="editor-catalog__price">{formatPrice(item.price)}</span><span className="editor-catalog__add"><EditorIcon name="plus"/></span>
-        </button>)}{!visibleCatalog.length && <p className="editor-muted">Ничего не найдено. Попробуйте другой запрос.</p>}</div>
-        <p className="editor-panel__hint">Нажмите на товар или перетащите его на сцену.</p>
+        <div className="editor-panel__head"><h2>{mode === "arch" ? "Шары и дополнения" : "Дополнить композицию"}</h2><small>{mode === "arch" ? "Шары — в слоты, остальные товары — рядом" : "Подарки и фольгированные фигуры"}</small></div>
+        <div className="editor-search-wrap"><EditorIcon name="search"/><input className="editor-search" aria-label="Поиск элементов" placeholder="Найти шар или подарок…" value={query} onChange={(event) => setQuery(event.target.value)}/></div>
+        <div className="editor-filters" aria-label="Категории">{categories.map((item) => <button key={item} type="button" aria-pressed={category === item} className={category === item ? "active" : ""} onClick={() => setCategory(item)}>{item}</button>)}</div>
+        <div className="editor-catalog__list">{visibleCatalog.map((item) => <div key={item.id} className="editor-catalog__item editor-catalog__item--v2" draggable onDragStart={(event) => startDrag(event, item.id)}>
+          <button className="editor-catalog__main" type="button" onClick={() => addFromCatalog(item.id)} title={mode === "arch" && isArchBalloon(item.id) ? `Добавить в слот ${selectedSlot + 1}` : "Добавить на сцену"}><CatalogArtwork item={item}/><span className="editor-catalog__name"><strong>{item.label}</strong><small>{isArchBalloon(item.id) ? "Шар для арки" : item.category}</small></span><span className="editor-catalog__price">{formatPrice(item.price)}</span><span className="editor-catalog__add"><EditorIcon name="plus"/></span></button>
+          {mode === "arch" && isArchBalloon(item.id) && <button type="button" className="editor-catalog__loose" onClick={() => addExtra(item.id)}>Поставить рядом</button>}
+        </div>)}{!visibleCatalog.length && <p className="editor-muted">Ничего не найдено. Попробуйте другой запрос.</p>}</div>
+        <p className="editor-panel__hint">{mode === "arch" ? `Выбран слот ${selectedSlot + 1}. Нажмите на шар или перетащите его в круглый слот.` : "Готовый шаблон остаётся неизменным. Дополнения можно перемещать на сцене."}</p>
       </aside>
 
       <section className="editor-workspace" aria-label="Сцена конструктора">
-        <div className="editor-workspace__toolbar"><div><h1>Конструктор набора</h1><span>{scene.elements.length} из {MAX_ELEMENTS} элементов</span></div><div className="editor-workspace__toolbar-actions"><button type="button" onClick={saveDraft}><EditorIcon name="save"/>Сохранить набор</button><button type="button" onClick={clearScene} disabled={!scene.elements.length}><EditorIcon name="clear"/><span className="editor-clear-label">Очистить</span></button></div></div>
-        <div className="editor-stage" tabIndex={0} onKeyDown={keyboardMove} aria-label="Сцена. Выбранный элемент можно двигать стрелками, удалить клавишей Delete."><SceneCanvas scene={scene} selectedId={selectedId} onSelect={(id) => { setSelectedId(id); setShowOptions(false); }} onChange={updateElement} onDropCatalog={addElement}/></div>
-        <div className="editor-controlbar" aria-label="Управление выбранным элементом">
-          {selected && selectedCatalog ? <>
-            <div className="editor-controlbar__item"><CatalogArtwork item={selectedCatalog}/><span><strong>{selectedCatalog.label}</strong><small>Выбранный элемент</small></span></div>
-            <label className="editor-controlbar__range">Размер <input aria-label="Размер выбранного элемента" type="range" min="0.55" max="1.85" step="0.05" value={selected.scale} onChange={(event) => updateElement(selected.id, { scale: Number(event.target.value) })}/><output>{Math.round(selected.scale * 100)}%</output></label>
-            <label className="editor-controlbar__range editor-controlbar__range--rotate">Поворот <EditorIcon name="rotate"/><input aria-label="Поворот выбранного элемента" type="range" min="-180" max="180" step="5" value={selected.rotation} onChange={(event) => updateElement(selected.id, { rotation: Number(event.target.value) })}/><output>{Math.round(selected.rotation)}°</output></label>
-            <div className="editor-controlbar__buttons"><button type="button" onClick={duplicateSelected} aria-label="Дублировать элемент" title="Дублировать"><EditorIcon name="copy"/></button><button type="button" className="editor-controlbar__delete" onClick={removeSelected} aria-label="Удалить элемент" title="Удалить"><EditorIcon name="trash"/></button><button type="button" onClick={() => setShowOptions((value) => !value)} aria-label="Дополнительные настройки" aria-expanded={showOptions} title="Дополнительные настройки"><EditorIcon name="more"/></button></div>
-          </> : <div className="editor-controlbar__placeholder">Выберите объект на сцене, чтобы изменить его размер и положение.</div>}
-        </div>
-        {selected && selectedCatalog && showOptions && <div className="editor-selection" aria-label="Дополнительные настройки элемента">
-          {(selectedCatalog.kind === "number" || selectedCatalog.kind === "inscription") && <label>{selectedCatalog.kind === "number" ? "Цифра (0–99)" : "Текст надписи"}<input value={selected.text || ""} maxLength={selectedCatalog.kind === "number" ? 2 : 40} inputMode={selectedCatalog.kind === "number" ? "numeric" : "text"} onChange={(event) => updateElement(selected.id, { text: selectedCatalog.kind === "number" ? event.target.value.replace(/\D/g, "") : event.target.value })}/></label>}
-          {selectedCatalog.kind === "product" && <p className="editor-selection__product">{selectedCatalog.description} {selectedCatalog.productId && <Link href={`/catalog/${selectedCatalog.productId}`}>Подробнее о товаре</Link>}</p>}
-          <div className="editor-selection__actions"><button type="button" onClick={() => moveLayer(-1)}><EditorIcon name="back"/>Назад</button><button type="button" onClick={() => moveLayer(1)}><EditorIcon name="front"/>Вперёд</button><button type="button" onClick={() => setSelectedId(null)}><EditorIcon name="close"/>Снять выделение</button></div>
+        <div className="editor-workspace__toolbar"><div><h1>{mode === "arch" ? "Своя арка" : "Готовая композиция"}</h1><span>{mode === "arch" ? `${filled.length} из ${balloons.length} шаров · высота ${arch.height} м` : template.title}</span></div><div className="editor-workspace__toolbar-actions"><button type="button" onClick={saveDraft}><EditorIcon name="save"/>Сохранить</button><button type="button" onClick={clearCurrent}><EditorIcon name="clear"/><span className="editor-clear-label">Очистить</span></button></div></div>
+        {mode === "arch" && <div className="arch-sizebar"><span>Высота арки</span><div role="group" aria-label="Высота арки">{archHeights.map((item) => <button type="button" key={item.value} className={arch.height === item.value ? "is-active" : ""} aria-pressed={arch.height === item.value} onClick={() => changeHeight(item.value)}>{item.label}</button>)}</div><small>Каркас: {formatPrice(archHeights.find((item) => item.value === arch.height)!.framePrice)}</small></div>}
+        {mode === "ready" ? <div className="editor-stage"><SceneCanvas scene={readyScene} lockedIds={baseElements.map((item) => item.id)} selectedId={selectedExtraId} onSelect={(id) => { setSelectedExtraId(id); setSelectedIndex(null); }} onChange={updateExtra} onDropCatalog={addFromCatalog}/></div> : <div className="arch-stage">
+          <div className="arch-slotrail" aria-label="Слоты цветов арки"><strong>Слоты арки</strong><small>Поставьте шар в каждый нужный слот</small><div className="arch-slotrail__list">{arch.slots.map((id, index) => { const item = id ? sceneCatalogById.get(id) : null; return <div className={`arch-slotrail__row ${selectedSlot === index ? "is-active" : ""}`} key={index}><button type="button" className="arch-slot" aria-label={`Слот ${index + 1}${item ? `: ${item.label}` : ": пустой"}`} aria-pressed={selectedSlot === index} onClick={() => { setSelectedSlot(index); setSelectedIndex(null); }} onDragOver={(event) => event.preventDefault()} onDrop={(event) => dropSlot(event, index)}><span className="arch-slot__circle" style={item ? { background: item.color } : undefined}>{item ? "" : "+"}</span><span><b>{arch.pattern === "cross" ? index === 0 ? "Рисунок X" : "Фон арки" : `Цвет ${index + 1}`}</b><small>{item?.label ?? "Пустой слот"}</small></span></button>{item && <button type="button" className="arch-slot__remove" aria-label={`Очистить слот ${index + 1}`} onClick={() => setSlot(index, null)}>×</button>}</div>; })}</div>{arch.pattern !== "cross" && <div className="arch-slotrail__count"><button type="button" onClick={() => changeSlotCount(-1)} disabled={arch.slots.length <= 2} aria-label="Уменьшить число слотов">−</button><span>{arch.slots.length} цвета</span><button type="button" onClick={() => changeSlotCount(1)} disabled={arch.slots.length >= 6} aria-label="Увеличить число слотов">+</button></div>}</div>
+          <ArchCanvas config={arch} selectedIndex={selectedIndex} selectedExtraId={selectedExtraId} onSelectIndex={(index) => { setSelectedIndex(index); setSelectedExtraId(null); }} onSelectExtra={(id) => { setSelectedExtraId(id); setSelectedIndex(null); }} onMoveBalloon={moveBalloon} onChangeExtra={updateExtra} onDropCatalog={addFromCatalog}/>
         </div>}
+        {mode === "arch" && selectedBalloon?.catalogId ? <div className="arch-balloon-editor"><div className="arch-balloon-editor__title"><strong>Шар №{selectedBalloon.index + 1}</strong><small>Индивидуальные параметры · итоговый размер {Math.round(23 * selectedBalloon.effectiveFactor)} см</small></div><label>Цвет<select aria-label="Цвет выбранного шара" value={selectedBalloon.catalogId} onChange={(event) => updateBalloon(selectedBalloon.index, { catalogId: event.target.value })}>{sceneCatalog.filter((item) => isArchBalloon(item.id)).map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label><label>Размер<select aria-label="Размер выбранного шара" value={selectedBalloon.size} onChange={(event) => changeBalloonSize(selectedBalloon.index, event.target.value as BalloonSize)}>{balloonSizes.map((item) => <option key={item.id} value={item.id}>{item.label} · {item.cm} см</option>)}</select></label><label>Материал<select aria-label="Материал выбранного шара" value={selectedBalloon.material} onChange={(event) => updateBalloon(selectedBalloon.index, { material: event.target.value as BalloonMaterial })}>{balloonMaterials.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label><button type="button" disabled={!filled.some((item) => item.index < selectedBalloon.index)} onClick={() => moveSelectedBalloon(-1)}>← Предыдущий</button><button type="button" disabled={!filled.some((item) => item.index > selectedBalloon.index)} onClick={() => moveSelectedBalloon(1)}>Следующий →</button><button type="button" onClick={() => setArch((current) => ({ ...current, overrides: current.overrides.filter((item) => item.index !== selectedBalloon.index) }))}>Сбросить изменения</button><small className="arch-balloon-editor__hint">Измените позицию кнопками или перетащите шар на другой шар.</small></div> : selectedExtra && selectedExtraCatalog ? <div className="arch-extra-editor"><CatalogArtwork item={selectedExtraCatalog}/><strong>{selectedExtraCatalog.label}</strong><label>Размер <input aria-label="Размер дополнения" type="range" min="0.55" max="1.85" step="0.05" value={selectedExtra.scale} onChange={(event) => updateExtra(selectedExtra.id, { scale: Number(event.target.value) })}/></label><button type="button" onClick={removeExtra}><EditorIcon name="trash"/> Удалить</button></div> : <div className="arch-editor-placeholder">{mode === "arch" ? "Нажмите на шар в арке, чтобы изменить его отдельно." : "Готовый шаблон не меняется. Выберите дополнение на сцене, чтобы изменить его."}</div>}
       </section>
 
-      <aside className={`editor-panel editor-templates ${mobilePanel === "templates" ? "editor-panel--mobile-active" : ""}`} aria-label="Готовые шаблоны">
-        <div className="editor-panel__head editor-panel__head--templates"><h2>Готовые шаблоны</h2><button type="button" onClick={() => { setMobilePanel("templates"); document.querySelector(".editor-templates__list")?.scrollIntoView({ behavior: "smooth", block: "nearest" }); }}>Смотреть все <EditorIcon name="arrow"/></button></div>
-        <div className="editor-templates__list">{sceneTemplates.map((template) => { const price = scenePrice({ version: 1, elements: template.elements.map((element, index) => ({ ...element, id: String(index) })) }); return <button type="button" className="editor-template" key={template.id} onClick={() => applyTemplate(template.id)}>
-          <TemplateArtwork template={template}/><span className="editor-template__body"><strong>{template.title}</strong><small>{template.description}</small><b>{formatPrice(price)}</b><span>Использовать</span></span>
-        </button>; })}</div>
-        <p className="editor-panel__hint">Любой шаблон можно изменить под ваш праздник.</p>
+      <aside className={`editor-panel editor-templates ${mobilePanel === "templates" ? "editor-panel--mobile-active" : ""}`} aria-label="Шаблоны и схемы">
+        <div className="arch-right-tabs" role="tablist" aria-label="Режим конструктора"><button type="button" role="tab" aria-selected={rightTab === "ready"} className={rightTab === "ready" ? "is-active" : ""} onClick={() => switchMode("ready")}>Готовые шаблоны</button><button type="button" role="tab" aria-selected={rightTab === "arch"} className={rightTab === "arch" ? "is-active" : ""} onClick={() => switchMode("arch")}>Схемы арки</button></div>
+        {rightTab === "ready" ? <><div className="editor-panel__head"><h2>Готовые шаблоны</h2><small>Композиции сохраняют свой исходный вид</small></div><div className="editor-templates__list">{sceneTemplates.map((item) => <button type="button" className={`editor-template ${mode === "ready" && ready.templateId === item.id ? "is-active" : ""}`} key={item.id} onClick={() => selectTemplate(item.id)}><TemplateArtwork template={item}/><span className="editor-template__body"><strong>{item.title}</strong><small>{item.description}</small><b>{formatPrice(readyPrice({ version: 1, templateId: item.id, extras: [] }))}</b><span>{mode === "ready" && ready.templateId === item.id ? "Выбран" : "Выбрать"}</span></span></button>)}</div><p className="editor-panel__hint">К шаблону можно добавить только подарок или фольгированную фигуру.</p></> : <><div className="editor-panel__head"><h2>Схемы расстановки</h2><small>Схема задаёт порядок шаров и число слотов</small></div><div className="arch-patterns">{archPatterns.map((item) => <button type="button" key={item.id} className={`arch-pattern ${arch.pattern === item.id ? "is-active" : ""}`} aria-pressed={arch.pattern === item.id} onClick={() => changePattern(item.id)}><span className={`arch-pattern__sample arch-pattern__sample--${item.id}`} aria-hidden="true"><i/><i/><i/><i/><i/><i/><i/><i/><i/></span><span><strong>{item.label}</strong><small>{item.detail}</small></span><b>{arch.pattern === item.id ? "✓" : "→"}</b></button>)}</div><p className="editor-panel__hint">X-рисунок использует два слота. В остальных схемах можно выбрать от двух до шести цветов.</p></>}
       </aside>
     </div>
-    <div className="editor-checkout"><div className="editor-checkout__items"><strong>Ваш набор</strong><div className="editor-checkout__thumbs">{scene.elements.slice(0, 7).map((element) => { const item = sceneCatalogById.get(element.catalogId); return item ? <span key={element.id} title={item.label}><CatalogArtwork item={item}/></span> : null; })}{scene.elements.length > 7 && <span className="editor-checkout__more">+{scene.elements.length - 7}</span>}{!scene.elements.length && <small>Пока пусто</small>}</div></div><div className="editor-checkout__total"><small>Итого</small><strong>{formatPrice(total)}</strong></div><button type="button" className="shop-button" onClick={toCart} disabled={!draftReady || !parsed}><EditorIcon name="basket"/>Добавить в корзину</button></div>
+    <div className="editor-checkout"><div className="editor-checkout__items"><strong>{mode === "arch" ? "Своя арка" : template.title}</strong><small>{mode === "arch" ? `${filled.length} шаров · высота ${arch.height} м` : `Готовый шаблон · ${ready.extras.length} дополнений`}</small></div><div className="editor-checkout__total"><small>Товары {formatPrice(subtotal)} + работа 10%</small><strong>{formatPrice(subtotal + fee)}</strong></div><button type="button" className="shop-button" onClick={toCart} disabled={!hydrated}><EditorIcon name="basket"/>Добавить в корзину</button></div>
     {notice && <p className="editor-notice" role="status">{notice}</p>}
-    <p className="editor-disclaimer">Предпросмотр показывает состав набора. Реальная форма и расположение элементов могут отличаться. Цены примерные; оплата сейчас демонстрационная.</p>
+    <p className="editor-disclaimer">Вместимость и цены арок пока примерные. Доставка включена в стоимость работы. Реальная оплата зависит от подключённого платёжного режима.</p>
   </main>;
 }

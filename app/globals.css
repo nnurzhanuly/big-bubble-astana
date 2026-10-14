@@ -65,3 +65,4 @@
 .catalog-sort__option.is-selected svg{opacity:1}
 @media(max-width:580px){.catalog-sort{width:100%;justify-content:space-between}.catalog-sort__control{flex:1}.catalog-sort__trigger{width:100%;min-width:0}.catalog-sort__menu{width:100%;min-width:230px}}
 @media(max-width:820px){.catalog-main,.catalog-tools,.catalog-sort__control{min-width:0}.catalog-mobile-chips{max-width:100%}}
+@media(min-width:581px) and (max-width:700px){.shop-header__row{flex-wrap:wrap;gap:10px;padding-top:10px;padding-bottom:10px}.shop-search{order:5;width:100%;flex:none;min-height:38px}.shop-header__actions{margin-left:auto}}

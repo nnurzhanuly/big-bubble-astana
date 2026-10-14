@@ -3,7 +3,7 @@ import { mkdir, readFile, writeFile, rename } from "node:fs/promises";
 import path from "node:path";
 import type { PaymentMode } from "./config";
 export type OrderStatus = "pending_payment" | "paid" | "paid_demo" | "failed";
-export type StoredOrder = { id: string; accessToken: string; createdAt: string; paidAt?: string; paymentTransactionId?: string; status: OrderStatus; mode: PaymentMode; name: string; phone: string; delivery: "delivery" | "pickup"; address: string | null; date: string | null; comment: string; items: { id: string; title: string; quantity: number; unitPrice: number; configuration?: import("../builder").BundleConfig | import("../scene").SceneConfig }[]; itemsTotal: number; deliveryFee: number; total: number; currency: "KZT" };
+export type StoredOrder = { id: string; accessToken: string; createdAt: string; paidAt?: string; paymentTransactionId?: string; status: OrderStatus; mode: PaymentMode; name: string; phone: string; delivery: "delivery" | "pickup"; address: string | null; date: string | null; comment: string; items: { id: string; title: string; quantity: number; unitPrice: number; configuration?: import("../builder").BundleConfig | import("../scene").SceneConfig | import("../arch").ArchConfig | import("../arch").ReadyConfig }[]; itemsTotal: number; serviceFee: number; deliveryFee: number; total: number; currency: "KZT" };
 const directory = () => path.join(process.cwd(), "data", "paid-orders");
 const orderPath = (id: string) => { if (!/^BB-[0-9A-F]{32}$/.test(id)) throw new Error("Invalid order id"); return path.join(directory(), `${id}.json`); };
 export const createAccessToken = () => randomBytes(24).toString("hex");
