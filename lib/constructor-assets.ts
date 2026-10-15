@@ -1,5 +1,5 @@
 export const constructorImages = {
-  arch: "/images/constructor-arch-real.png",
+  arch: "/images/constructor-arch-complete.png",
   latex: "/images/constructor-latex-real.png",
   latexExtra: "/images/constructor-latex-extra-real.png",
   accents: "/images/constructor-accents-real.png",

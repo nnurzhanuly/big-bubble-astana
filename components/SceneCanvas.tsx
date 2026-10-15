@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState, type DragEvent } from "react";
-import { Ellipse, Group, Image as KonvaImage, Layer, Line, Rect, RegularPolygon, Stage, Text, Transformer } from "react-konva";
+import { Ellipse, Group, Image as KonvaImage, Layer, Line, Path, Rect, RegularPolygon, Stage, Text, Transformer } from "react-konva";
 import type Konva from "konva";
 import { sceneCatalogById, type SceneConfig, type SceneElement } from "@/lib/scene";
 import { constructorImages, constructorSprites } from "@/lib/constructor-assets";
@@ -104,8 +104,8 @@ function SceneObject({ element, selected, locked, onSelect, onChange, assets }: 
         <RegularPolygon x={0} y={39} sides={3} radius={7} rotation={180} fill={item.color} listening={false}/>
         <Ellipse x={-12} y={-22} radiusX={8} radiusY={16} rotation={-28} fill="#ffffff88" listening={false}/>
       </>}
-      {item.kind === "arch" && assets.arch && <KonvaImage image={assets.arch} x={-245} y={-230} width={520} height={475} shadowColor="#715c62" shadowBlur={9} shadowOpacity={.08}/>}
-      {item.kind === "arch" && !assets.arch && <Rect x={-200} y={-200} width={400} height={400} cornerRadius={190} stroke="#dfc2c9" strokeWidth={26}/>}
+      {item.kind === "arch" && assets.arch && <KonvaImage image={assets.arch} x={-307} y={-215} width={614} height={410} shadowColor="#715c62" shadowBlur={9} shadowOpacity={.08}/>}
+      {item.kind === "arch" && !assets.arch && <Path data="M -285 190 C -285 -45 -170 -190 0 -190 C 170 -190 285 -45 285 190" stroke="#dfc2c9" strokeWidth={26} lineCap="round"/>}
       {accentImage && sprite && realAccent && <KonvaImage image={accentImage} crop={cellCrop(accentImage, sprite.cell)} x={item.kind === "box" ? -70 : -60} y={item.kind === "box" ? -62 : -56} width={item.kind === "box" ? 140 : 120} height={item.kind === "box" ? 140 : 120} shadowColor="#614959" shadowBlur={8} shadowOpacity={.12}/>}
       {item.kind === "heart" && !accentImage && <Text x={-47} y={-53} width={94} height={106} text="♥" fontSize={92} align="center" fill={item.color} shadowColor="#6d324b" shadowBlur={12} shadowOpacity={.25}/>}
       {item.kind === "star" && !accentImage && <Text x={-45} y={-51} width={90} height={102} text="★" fontSize={88} align="center" fill={item.color} shadowColor="#6d4f30" shadowBlur={12} shadowOpacity={.25}/>}
